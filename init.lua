@@ -14,17 +14,19 @@ local function woodcut_node(pos, playername)
 		return
 	end
 
+	-- check node already digged / right node at place
 	local node = minetest.get_node(pos)
-	local nodedef = minetest.registered_nodes[node.name]
-	-- check node already digged
-	if not (nodedef.groups.tree or nodedef.groups.leaves or nodedef.groups.leafdecay) then
+	local id = minetest.get_content_id(node.name)
+
+	if not (woodcutting.tree_content_ids[id] or woodcutting.leaves_content_ids[id]) then
 		return
 	end
+
 	-- dig the node
 	minetest.node_dig(pos, node, digger)
 
 	-- Search for leaves only for tree
-	if not nodedef.groups.tree then
+	if not woodcutting.tree_content_ids[id] then
 		return
 	end
 
@@ -107,12 +109,9 @@ end
 -- dig node - check if woodcutting and initialize the work
 ----------------------------
 minetest.register_on_dignode(function(pos, oldnode, digger)
-	local removed_nodedef = minetest.registered_nodes[oldnode.name]
-
 	-- check removed node is tree / check the digger is still online
-	if not removed_nodedef
-			or not removed_nodedef.groups.tree
-			or not digger then
+	local id = minetest.get_content_id(oldnode.name)
+	if not woodcutting.tree_content_ids[id] or not digger then
 		return
 	end
 
@@ -177,7 +176,7 @@ minetest.after(0, function ()
 		if v.groups.tree then
 			local id = minetest.get_content_id(k)
 			woodcutting.tree_content_ids[id] = k
-		elseif v.groups.leaves or v.groups.leafdecay then
+		elseif v.groups.leafdecay then
 			local id = minetest.get_content_id(k)
 			woodcutting.leaves_content_ids[id] = k
 		end
