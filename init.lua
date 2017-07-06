@@ -196,7 +196,7 @@ minetest.after(0, function ()
 end)
 
 
-minetest.register_on_respawnplayer(function(player)
+minetest.register_on_dieplayer(function(player)
 	local playername = player:get_player_name()
 	if woodcutting.inprocess[playername] then
 		player:hud_remove(woodcutting.inprocess[playername].hud)
