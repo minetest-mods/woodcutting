@@ -1,115 +1,220 @@
 woodcutting = {}
+
+woodcutting.default_settings = {
+	tree_distance = 1, -- 1 means touching nodes only
+	leaves_distance = 2 -- do not touch leaves around the not removed trees with this distance
+}
+
 woodcutting.tree_content_ids = {}
 woodcutting.leaves_content_ids = {}
-woodcutting.inprocess = {}
+woodcutting.process_runtime = {}
 
------------------------------
--- Process single node async
+local woodcutting_class = {}
+woodcutting_class.__index = woodcutting_class
+
 ----------------------------
-local function woodcut_node(pos, playername)
-	-- check digger is still in game
-	local digger = minetest.get_player_by_name(playername)
-	if not digger then
-		woodcutting.inprocess[playername] = nil
-		return
+--- Constructor. Create a new process with template
+----------------------------
+function woodcutting.new_process(playername, template)
+	local process = setmetatable(template, woodcutting_class)
+	process.__index = woodcutting_class
+	woodcutting.process_runtime[playername] = process
+	process.treenodes_sorted = {} -- simple sortable list
+	process.treenodes_hashed = {} -- With minetest.hash_node_position() as key for deduplication
+	process.playername = playername
+	process.tree_distance = process.tree_distance or woodcutting.default_settings.tree_distance
+	process.leaves_distance = process.leaves_distance or woodcutting.default_settings.leaves_distance
+	process:add_hud()
+	process = woodcutting.get_process(playername) -- note: self is stored in inporcess table, but get_process function does additional data enrichments
+	process:process_woodcut_step()
+	return process
+end
+
+----------------------------
+-- Getter - get running process for player
+----------------------------
+function woodcutting.get_process(playername)
+	local process = woodcutting.process_runtime[playername]
+	if process then
+		process._player = minetest.get_player_by_name(playername)
+		if not process._player then
+			-- stop process if player leaved the game
+			process:stop_process()
+			return nil
+		end
 	end
+	return process
+end
 
-	-- check node already digged / right node at place
-	local node = minetest.get_node(pos)
-	local id = minetest.get_content_id(node.name)
-
-	if not (woodcutting.tree_content_ids[id] or woodcutting.leaves_content_ids[id]) then
-		return
+----------------------------------
+--- Stop the woodcutting process
+----------------------------------
+function woodcutting_class:stop_process()
+	if self._hud and self._player then
+		self._player:hud_remove(self._hud)
 	end
+	woodcutting.process_runtime[self.playername] = nil
+end
 
-	-- dig the node
-	minetest.node_dig(pos, node, digger)
-
-	-- Search for leaves only for tree
-	if not woodcutting.tree_content_ids[id] then
-		return
-	end
-
+----------------------------------
+--- Add neighbors tree nodes to the list for further processing
+----------------------------------
+function woodcutting_class:add_tree_neighbors(pos)
 	-- read map around the node
 	local vm = minetest.get_voxel_manip()
-	local minp, maxp = vm:read_from_map(vector.subtract(pos, 8), vector.add(pos, 8))
+	local r_min = vector.subtract(pos, self.tree_distance)
+	local r_max = vector.add(pos, self.tree_distance)
+	local minp, maxp = vm:read_from_map(r_min, r_max)
 	local area = VoxelArea:new({MinEdge = minp, MaxEdge = maxp})
 	local data = vm:get_data()
 
-	-- process leaves nodes
-	for i in area:iterp(vector.subtract(pos,8), vector.add(pos,8)) do
-		if woodcutting.leaves_content_ids[data[i]] then
-			local leavespos = area:position(i)
-			-- search if no other tree node near the leaves
-			local tree_found = false
-			for i2 in area:iterp(vector.subtract(leavespos,2), vector.add(leavespos,2)) do
-				if woodcutting.tree_content_ids[data[i2] ] then
---					local chkposhash = minetest.hash_node_position(area:position(i2))
---					if not process.treenodes_hashed[chkposhash] and
-						tree_found = true
-						break
---					end
-				end
-			end
-			if not tree_found then
-				minetest.after(0.1, woodcut_node, leavespos, playername)
+	-- collect tree nodes to the lists
+	for i in area:iterp(r_min, r_max) do
+		local tree_nodename = woodcutting.tree_content_ids[data[i]]
+		if tree_nodename then
+			local pos = area:position(i)
+			local poshash = minetest.hash_node_position(pos)
+			if not self.treenodes_hashed[poshash] then
+				table.insert(self.treenodes_sorted, pos)
+				self.treenodes_hashed[poshash] = tree_nodename
 			end
 		end
 	end
 end
 
-----------------------------
--- Process all relevant nodes around the digged
-----------------------------
-local function woodcut(playername)
-	-- check digger is still in game
-	local digger = minetest.get_player_by_name(playername)
-	if not digger then
-		woodcutting.inprocess[playername] = nil
-		return
-	end
-	local playerpos = digger:get_pos()
+----------------------------------
+--- Get the delay time before processing the node at pos
+----------------------------------
+function woodcutting_class:get_delay_time(poshash)
+	local nodedef = minetest.registered_nodes[self.treenodes_hashed[poshash]]
+	local capabilities = self._player:get_wielded_item():get_tool_capabilities()
+	local dig_params = minetest.get_dig_params(nodedef.groups, capabilities)
+	return dig_params.time
+end
 
-	-- check the process
-	local process =  woodcutting.inprocess[playername] 
-	if not process then
-		return
-	end
+----------------------------------
+--- Check node removal allowed
+----------------------------------
+function woodcutting_class:check_processing_allowed(pos)
+	return vector.distance(pos, self._player:get_pos()) < 100
+end
 
-	-- sort the table for priorization higher nodes, select the first one and process them
-	table.sort(process.treenodes_sorted, function(a,b)
-		local aval = math.abs(playerpos.x-a.x) + math.abs(playerpos.z-a.z)
-		local bval = math.abs(playerpos.x-b.x) + math.abs(playerpos.z-b.z)
-		if aval == bval then -- if same horizontal distance, prever higher node
-			aval = -a.z
-			bval = -b.z
+----------------------------------
+--- Process a woodcut step in minetest.after chain. Select a tree node and trigger processing for them
+----------------------------------
+function woodcutting_class:process_woodcut_step()
+	local function run_process_woodcut_step(playername)
+		local process = woodcutting.get_process(playername)
+		if not process then
+			return
 		end
-		return aval < bval
-	end)
-	local pos = process.treenodes_sorted[1]
-	if pos then
+
+		local playerpos = process._player:get_pos()
+		-- sort the table for priorization higher nodes, select the first one and process them
+		table.sort(process.treenodes_sorted, function(a,b)
+			local aval = math.abs(playerpos.x-a.x) + math.abs(playerpos.z-a.z)
+			local bval = math.abs(playerpos.x-b.x) + math.abs(playerpos.z-b.z)
+			if aval == bval then -- if same horizontal distance, prever higher node
+				aval = -a.z
+				bval = -b.z
+			end
+			return aval < bval
+		end)
+		local pos = process.treenodes_sorted[1]
+		process.selected_pos = pos
+
+		if pos then
+			table.remove(process.treenodes_sorted, 1)
+			if process:check_processing_allowed(pos) then
+				-- dig the node
+				local delaytime = process:get_delay_time(minetest.hash_node_position(pos))
+				process:woodcut_node(pos, delaytime)
+			end
+		elseif next(process.treenodes_hashed) then
+			-- nothing selected but still running. Trigger next step
+			process:process_woodcut_step()
+		else
+			process:stop_process()
+		end
+	end
+	minetest.after(0.1, run_process_woodcut_step, self.playername)
+end
+
+----------------------------
+-- Process single node async
+----------------------------
+function woodcutting_class:woodcut_node(pos, delay)
+	local function run_woodcut_node(playername, pos)
+		-- get current process object (async start)
+		local process = woodcutting.get_process(playername)
+		if not process then
+			return
+		end
+
+		-- Check it is async chain, trigger the next step in this case
 		local poshash = minetest.hash_node_position(pos)
-		local delaytime = 0
+		if process.treenodes_hashed[poshash] then
+			process:process_woodcut_step()
+			process.treenodes_hashed[poshash] = nil
+		end
+
+		-- Check right node at place for removal
+		local node = minetest.get_node(pos)
+		local id = minetest.get_content_id(node.name)
+		if not (woodcutting.tree_content_ids[id] or woodcutting.leaves_content_ids[id]) then
+			return
+		end
 
 		-- dig the node
-		if vector.distance(pos, playerpos) < 100 then
-			local nodedef = minetest.registered_nodes[process.treenodes_hashed[poshash]]
-			local capabilities = digger:get_wielded_item():get_tool_capabilities()
-			local dig_params = minetest.get_dig_params(nodedef.groups, capabilities)
-			delaytime = dig_params.time
-			minetest.after(0.0, woodcut_node, pos, playername)
+		minetest.node_dig(pos, node, process._player)
+
+		-- Search for leaves only if tree node was removed
+		if not woodcutting.tree_content_ids[id] then
+			return
 		end
 
-		-- remove selected node from list
-		table.remove(process.treenodes_sorted, 1)
-		process.treenodes_hashed[poshash] = nil
+		local vm = minetest.get_voxel_manip()
+		local r_min = vector.subtract(pos, process.leaves_distance * 2 + 3)
+		local r_max = vector.add(pos, process.leaves_distance * 2 + 3)
+		local minp, maxp = vm:read_from_map(r_min, r_max)
+		local area = VoxelArea:new({MinEdge = minp, MaxEdge = maxp})
+		local data = vm:get_data()
 
-		-- next step
-		minetest.after(delaytime, woodcut, playername)
-	else
-		-- finished
-		digger:hud_remove(woodcutting.inprocess[playername].hud)
-		woodcutting.inprocess[playername] = nil
+		for i in area:iterp(r_min, r_max) do
+			if woodcutting.leaves_content_ids[data[i]] then
+				local leavespos = area:position(i)
+				-- search if no other tree node near the leaves
+				local tree_found = false
+				for i2 in area:iterp(vector.subtract(leavespos,process.leaves_distance), vector.add(leavespos,process.leaves_distance)) do
+					if woodcutting.tree_content_ids[data[i2] ] then
+						tree_found = true
+						break
+					end
+				end
+				if not tree_found then
+					process:woodcut_node(leavespos, 0)
+				end
+			end
+		end
+	end
+	minetest.after(delay, run_woodcut_node, self.playername, pos)
+end
+
+----------------------------------
+--- Enable players hud message
+----------------------------------
+function woodcutting_class:add_hud()
+	local player = minetest.get_player_by_name(self.playername)
+	if player then
+		self._hud = player:hud_add({
+			hud_elem_type = "text",
+			position = {x=0.3,y=0.3},
+			alignment = {x=0,y=0},
+			size = "",
+			text = "Woodcutting active. Hold sneak key to disable it",
+			number = 0xFFFFFF,
+			offset = {x=0, y=0},
+		})
 	end
 end
 
@@ -123,43 +228,26 @@ minetest.register_on_dignode(function(pos, oldnode, digger)
 		return
 	end
 
-	-- Check if it is an in process job
+	-- Get the process or create new one
 	local playername = digger:get_player_name()
 	local sneak = digger:get_player_control().sneak
-	local process
-	if woodcutting.inprocess[playername] then
-		-- woodcutting job already in process
-		process = woodcutting.inprocess[playername]
-	elseif not sneak then
-		-- No job, no sneak, nothing to do
-		return
-	else
-		-- No job but sneak pressed - start new process
-		process = {
-			sneak_pressed = true,
-			treenodes_sorted = {}, -- simple sortable list
-			treenodes_hashed = {}, -- With minetest.hash_node_position(9 as key for deduplication
-		}
-		process.hud = digger:hud_add({
-			hud_elem_type = "text",
-			position = {x=0.3,y=0.3},
-			alignment = {x=0,y=0},
-			size = "",
-			text = "Woodcutting active. Hold sneak key to disable it",
-			number = 0xFFFFFF,
-			offset = {x=0, y=0},
-		})
-
-		woodcutting.inprocess[playername] = process
-		minetest.after(0.1, woodcut, playername) -- note: woodcut is called after the treenodes_lists are filled
+	local process = woodcutting.get_process(playername)
+	if not process then
+		if not sneak then
+			-- No job, no sneak, nothing to do
+			return
+		else
+			process = woodcutting.new_process(playername, { 
+				sneak_pressed = true, -- to control sneak toggle
+			})
+		end
 	end
 
 	-- process the sneak toggle
 	if sneak then
 		if not process.sneak_pressed then
 			-- sneak pressed second time - stop the work
-			digger:hud_remove(woodcutting.inprocess[playername].hud)
-			woodcutting.inprocess[playername] = nil
+			process:stop_process()
 			return
 		end
 	else
@@ -168,28 +256,14 @@ minetest.register_on_dignode(function(pos, oldnode, digger)
 		end
 	end
 
-	-- read map around the node
-	local vm = minetest.get_voxel_manip()
-	local minp, maxp = vm:read_from_map(vector.subtract(pos, 1), vector.add(pos, 1))
-	local area = VoxelArea:new({MinEdge = minp, MaxEdge = maxp})
-	local data = vm:get_data()
-
-	-- collect tree nodes to the lists
-	for i in area:iterp(vector.subtract(pos,1), vector.add(pos,1)) do
-		local tree_nodename = woodcutting.tree_content_ids[data[i]]
-		if tree_nodename then
-			local pos = area:position(i)
-			local poshash = minetest.hash_node_position(pos)
-			if not process.treenodes_hashed[poshash] then
-				table.insert(process.treenodes_sorted, pos)
-				process.treenodes_hashed[poshash] = tree_nodename
-			end
-		end
-	end
+	-- add the neighbors to the list.
+	-- Note: The processing is started in new_process() using minetest.after() functionlity
+	process:add_tree_neighbors(pos)
 end)
 
-
+----------------------------
 -- start collecting infos about trees and leaves after all mods loaded
+----------------------------
 minetest.after(0, function ()
 	for k, v in pairs(minetest.registered_nodes) do
 		if v.groups.tree then
@@ -202,11 +276,12 @@ minetest.after(0, function ()
 	end
 end)
 
+----------------------------
 -- Stop work if the player dies
+----------------------------
 minetest.register_on_dieplayer(function(player)
-	local playername = player:get_player_name()
-	if woodcutting.inprocess[playername] then
-		player:hud_remove(woodcutting.inprocess[playername].hud)
-		woodcutting.inprocess[playername] = nil
+	local process = woodcutting.get_process(player:get_player_name())
+	if process then
+		process:stop_process()
 	end
 end)
