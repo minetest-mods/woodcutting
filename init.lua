@@ -1,8 +1,11 @@
 woodcutting = {}
 
-woodcutting.default_settings = {
-	tree_distance = 1, -- 1 means touching nodes only
-	leaves_distance = 2 -- do not touch leaves around the not removed trees with this distance
+woodcutting.settings = {
+	tree_distance = 1,   -- 1 means touching nodes only
+	leaves_distance = 2, -- do not touch leaves around the not removed trees with this distance
+	on_new_process_hook = function(process) return true end, -- do not start the process if set to nil or return false
+	on_step_hook = function(process) return true end,        -- if false is returned finish the process
+	on_woodcut_hook = function(process, pos) return true end, -- if false is returned the node is skipped
 }
 
 woodcutting.tree_content_ids = {}
@@ -18,13 +21,19 @@ woodcutting_class.__index = woodcutting_class
 function woodcutting.new_process(playername, template)
 	local process = setmetatable(template, woodcutting_class)
 	process.__index = woodcutting_class
-	woodcutting.process_runtime[playername] = process
 	process.treenodes_sorted = {} -- simple sortable list
 	process.treenodes_hashed = {} -- With minetest.hash_node_position() as key for deduplication
 	process.playername = playername
-	process.tree_distance = process.tree_distance or woodcutting.default_settings.tree_distance
-	process.leaves_distance = process.leaves_distance or woodcutting.default_settings.leaves_distance
+	process.tree_distance = process.tree_distance or woodcutting.settings.tree_distance
+	process.leaves_distance = process.leaves_distance or woodcutting.settings.leaves_distance
+
+	local hook = woodcutting.settings.on_new_process_hook(process)
+	if hook == false then
+		return
+	end
+
 	process:add_hud()
+	woodcutting.process_runtime[playername] = process
 	process = woodcutting.get_process(playername) -- note: self is stored in inporcess table, but get_process function does additional data enrichments
 	process:process_woodcut_step()
 	return process
@@ -40,7 +49,7 @@ function woodcutting.get_process(playername)
 		if not process._player then
 			-- stop process if player leaved the game
 			process:stop_process()
-			return nil
+			return
 		end
 	end
 	return process
@@ -100,6 +109,24 @@ function woodcutting_class:check_processing_allowed(pos)
 end
 
 ----------------------------------
+--- Select the next tree node for cutting
+----------------------------------
+function woodcutting_class:select_next_tree_node()
+	local playerpos = self._player:get_pos()
+	-- sort the table for priorization higher nodes, select the first one and process them
+	table.sort(self.treenodes_sorted, function(a,b)
+		local aval = math.abs(playerpos.x-a.x) + math.abs(playerpos.z-a.z)
+		local bval = math.abs(playerpos.x-b.x) + math.abs(playerpos.z-b.z)
+		if aval == bval then -- if same horizontal distance, prever higher node
+			aval = -a.z
+			bval = -b.z
+		end
+		return aval < bval
+	end)
+	return self.treenodes_sorted[1]
+end
+
+----------------------------------
 --- Process a woodcut step in minetest.after chain. Select a tree node and trigger processing for them
 ----------------------------------
 function woodcutting_class:process_woodcut_step()
@@ -109,18 +136,13 @@ function woodcutting_class:process_woodcut_step()
 			return
 		end
 
-		local playerpos = process._player:get_pos()
-		-- sort the table for priorization higher nodes, select the first one and process them
-		table.sort(process.treenodes_sorted, function(a,b)
-			local aval = math.abs(playerpos.x-a.x) + math.abs(playerpos.z-a.z)
-			local bval = math.abs(playerpos.x-b.x) + math.abs(playerpos.z-b.z)
-			if aval == bval then -- if same horizontal distance, prever higher node
-				aval = -a.z
-				bval = -b.z
-			end
-			return aval < bval
-		end)
-		local pos = process.treenodes_sorted[1]
+		local hook = woodcutting.settings.on_step_hook(process)
+		if hook == false then
+			process:stop_process()
+			return
+		end
+
+		local pos = process:select_next_tree_node()
 		process.selected_pos = pos
 
 		if pos then
@@ -135,6 +157,7 @@ function woodcutting_class:process_woodcut_step()
 			process:process_woodcut_step()
 		else
 			process:stop_process()
+			return
 		end
 	end
 	minetest.after(0.1, run_process_woodcut_step, self.playername)
@@ -156,6 +179,11 @@ function woodcutting_class:woodcut_node(pos, delay)
 		if process.treenodes_hashed[poshash] then
 			process:process_woodcut_step()
 			process.treenodes_hashed[poshash] = nil
+		end
+
+		local hook = woodcutting.settings.on_woodcut_hook(process, pos)
+		if hook == false then
+			return
 		end
 
 		-- Check right node at place for removal
@@ -232,15 +260,13 @@ minetest.register_on_dignode(function(pos, oldnode, digger)
 	local playername = digger:get_player_name()
 	local sneak = digger:get_player_control().sneak
 	local process = woodcutting.get_process(playername)
+	if not process and sneak then
+		process = woodcutting.new_process(playername, {
+			sneak_pressed = true, -- to control sneak toggle
+		})
+	end
 	if not process then
-		if not sneak then
-			-- No job, no sneak, nothing to do
-			return
-		else
-			process = woodcutting.new_process(playername, { 
-				sneak_pressed = true, -- to control sneak toggle
-			})
-		end
+		return
 	end
 
 	-- process the sneak toggle
