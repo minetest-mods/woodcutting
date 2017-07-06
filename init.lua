@@ -101,6 +101,7 @@ local function woodcut(playername)
 		minetest.after(dig_params.time, woodcut, playername)
 	else
 		-- finished
+		digger:hud_remove(woodcutting.inprocess[playername].hud)
 		woodcutting.inprocess[playername] = nil
 	end
 end
@@ -132,6 +133,16 @@ minetest.register_on_dignode(function(pos, oldnode, digger)
 			treenodes_sorted = {}, -- simple sortable list
 			treenodes_hashed = {}, -- With minetest.hash_node_position(9 as key for deduplication
 		}
+		process.hud = digger:hud_add({
+			hud_elem_type = "text",
+			position = {x=0.3,y=0.3},
+			alignment = {x=0,y=0},
+			size = "",
+			text = "Woodcutting active. Hold sneak key to disable it",
+			number = 0xFFFFFF,
+			offset = {x=0, y=0},
+		})
+
 		woodcutting.inprocess[playername] = process
 		minetest.after(0.1, woodcut, playername) -- note: woodcut is called after the treenodes_lists are filled
 	end
@@ -140,6 +151,7 @@ minetest.register_on_dignode(function(pos, oldnode, digger)
 	if sneak then
 		if not process.sneak_pressed then
 			-- sneak pressed second time - stop the work
+			digger:hud_remove(woodcutting.inprocess[playername].hud)
 			woodcutting.inprocess[playername] = nil
 			return
 		end
