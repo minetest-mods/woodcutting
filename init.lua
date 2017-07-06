@@ -32,9 +32,9 @@ function woodcutting.new_process(playername, template)
 		return
 	end
 
-	process:add_hud()
 	woodcutting.process_runtime[playername] = process
 	process = woodcutting.get_process(playername) -- note: self is stored in inporcess table, but get_process function does additional data enrichments
+	process:show_hud()
 	process:process_woodcut_step()
 	return process
 end
@@ -143,8 +143,7 @@ function woodcutting_class:process_woodcut_step()
 		end
 
 		local pos = process:select_next_tree_node()
-		process.selected_pos = pos
-
+		process:show_hud(pos)
 		if pos then
 			table.remove(process.treenodes_sorted, 1)
 			if process:check_processing_allowed(pos) then
@@ -231,18 +230,28 @@ end
 ----------------------------------
 --- Enable players hud message
 ----------------------------------
-function woodcutting_class:add_hud()
-	local player = minetest.get_player_by_name(self.playername)
-	if player then
-		self._hud = player:hud_add({
-			hud_elem_type = "text",
-			position = {x=0.3,y=0.3},
-			alignment = {x=0,y=0},
-			size = "",
-			text = "Woodcutting active. Hold sneak key to disable it",
-			number = 0xFFFFFF,
-			offset = {x=0, y=0},
-		})
+function woodcutting_class:show_hud(pos)
+	if not self._player then
+		return
+	end
+
+	local message = "Woodcutting active. Hold sneak key to disable it"
+	if pos then
+		message = minetest.pos_to_string(pos).." "..message
+	end
+
+	if self._hud then
+		self._player:hud_change(self._hud, "text", message)
+	else
+		self._hud = self._player:hud_add({
+				hud_elem_type = "text",
+				position = {x=0.3,y=0.3},
+				alignment = {x=0,y=0},
+				size = "",
+				text = message,
+				number = 0xFFFFFF,
+				offset = {x=0, y=0},
+			})
 	end
 end
 
