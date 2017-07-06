@@ -89,16 +89,23 @@ local function woodcut(playername)
 	local pos = process.treenodes_sorted[1]
 	if pos then
 		local poshash = minetest.hash_node_position(pos)
-		local nodedef = minetest.registered_nodes[process.treenodes_hashed[poshash]]
-		local capabilities = digger:get_wielded_item():get_tool_capabilities()
-		local dig_params = minetest.get_dig_params(nodedef.groups, capabilities)
+		local delaytime = 0
 
+		-- dig the node
+		if vector.distance(pos, playerpos) < 100 then
+			local nodedef = minetest.registered_nodes[process.treenodes_hashed[poshash]]
+			local capabilities = digger:get_wielded_item():get_tool_capabilities()
+			local dig_params = minetest.get_dig_params(nodedef.groups, capabilities)
+			delaytime = dig_params.time
+			minetest.after(0.0, woodcut_node, pos, playername)
+		end
+
+		-- remove selected node from list
 		table.remove(process.treenodes_sorted, 1)
 		process.treenodes_hashed[poshash] = nil
-		minetest.after(0.0, woodcut_node, pos, playername)
 
 		-- next step
-		minetest.after(dig_params.time, woodcut, playername)
+		minetest.after(delaytime, woodcut, playername)
 	else
 		-- finished
 		digger:hud_remove(woodcutting.inprocess[playername].hud)
@@ -195,7 +202,7 @@ minetest.after(0, function ()
 	end
 end)
 
-
+-- Stop work if the player dies
 minetest.register_on_dieplayer(function(player)
 	local playername = player:get_player_name()
 	if woodcutting.inprocess[playername] then
