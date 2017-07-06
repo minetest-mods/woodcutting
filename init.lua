@@ -94,7 +94,8 @@ end
 ----------------------------------
 --- Get the delay time before processing the node at pos
 ----------------------------------
-function woodcutting_class:get_delay_time(poshash)
+function woodcutting_class:get_delay_time(pos)
+	local poshash = minetest.hash_node_position(pos)
 	local nodedef = minetest.registered_nodes[self.treenodes_hashed[poshash]]
 	local capabilities = self._player:get_wielded_item():get_tool_capabilities()
 	local dig_params = minetest.get_dig_params(nodedef.groups, capabilities)
@@ -148,7 +149,7 @@ function woodcutting_class:process_woodcut_step()
 			table.remove(process.treenodes_sorted, 1)
 			if process:check_processing_allowed(pos) then
 				-- dig the node
-				local delaytime = process:get_delay_time(minetest.hash_node_position(pos))
+				local delaytime = process:get_delay_time(pos)
 				process:woodcut_node(pos, delaytime)
 			end
 		elseif next(process.treenodes_hashed) then
