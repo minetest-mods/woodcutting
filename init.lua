@@ -186,7 +186,7 @@ function woodcutting_class:woodcut_node(pos, delay)
 			return
 		end
 
-		-- Check right node at place for removal
+		-- Check right node at the place before removal
 		local node = minetest.get_node(pos)
 		local id = minetest.get_content_id(node.name)
 		if not (woodcutting.tree_content_ids[id] or woodcutting.leaves_content_ids[id]) then
@@ -195,37 +195,37 @@ function woodcutting_class:woodcut_node(pos, delay)
 
 		-- dig the node
 		minetest.node_dig(pos, node, process._player)
+	end
+	minetest.after(delay, run_woodcut_node, self.playername, pos)
+end
 
-		-- Search for leaves only if tree node was removed
-		if not woodcutting.tree_content_ids[id] then
-			return
-		end
+----------------------------
+-- Process leaves around the tree node
+----------------------------
+function woodcutting_class:process_leaves(pos)
+	local vm = minetest.get_voxel_manip()
+	local r_min = vector.subtract(pos, self.leaves_distance * 2 + 3)
+	local r_max = vector.add(pos, self.leaves_distance * 2 + 3)
+	local minp, maxp = vm:read_from_map(r_min, r_max)
+	local area = VoxelArea:new({MinEdge = minp, MaxEdge = maxp})
+	local data = vm:get_data()
 
-		local vm = minetest.get_voxel_manip()
-		local r_min = vector.subtract(pos, process.leaves_distance * 2 + 3)
-		local r_max = vector.add(pos, process.leaves_distance * 2 + 3)
-		local minp, maxp = vm:read_from_map(r_min, r_max)
-		local area = VoxelArea:new({MinEdge = minp, MaxEdge = maxp})
-		local data = vm:get_data()
-
-		for i in area:iterp(r_min, r_max) do
-			if woodcutting.leaves_content_ids[data[i]] then
-				local leavespos = area:position(i)
-				-- search if no other tree node near the leaves
-				local tree_found = false
-				for i2 in area:iterp(vector.subtract(leavespos,process.leaves_distance), vector.add(leavespos,process.leaves_distance)) do
-					if woodcutting.tree_content_ids[data[i2] ] then
-						tree_found = true
-						break
-					end
+	for i in area:iterp(r_min, r_max) do
+		if woodcutting.leaves_content_ids[data[i]] then
+			local leavespos = area:position(i)
+			-- search if no other tree node near the leaves
+			local tree_found = false
+			for i2 in area:iterp(vector.subtract(leavespos,self.leaves_distance), vector.add(leavespos,self.leaves_distance)) do
+				if woodcutting.tree_content_ids[data[i2] ] then
+					tree_found = true
+					break
 				end
-				if not tree_found then
-					process:woodcut_node(leavespos, 0)
-				end
+			end
+			if not tree_found then
+				self:woodcut_node(leavespos, 0)
 			end
 		end
 	end
-	minetest.after(delay, run_woodcut_node, self.playername, pos)
 end
 
 ----------------------------------
@@ -238,7 +238,7 @@ function woodcutting_class:show_hud(pos)
 
 	local message = "Woodcutting active. Hold sneak key to disable it"
 	if pos then
-		message = minetest.pos_to_string(pos).." "..message
+		message = '['..#self.treenodes_sorted..'] '..minetest.pos_to_string(pos).." | "..message
 	end
 
 	if self._hud then
@@ -295,6 +295,9 @@ minetest.register_on_dignode(function(pos, oldnode, digger)
 	-- add the neighbors to the list.
 	-- Note: The processing is started in new_process() using minetest.after() functionlity
 	process:add_tree_neighbors(pos)
+
+	-- process leaves for cutted node
+	process:process_leaves(pos)
 end)
 
 ----------------------------
