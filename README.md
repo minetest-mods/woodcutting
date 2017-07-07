@@ -9,10 +9,10 @@ This mod is an asynchrounus tree cutter for minetest. Mine the first tree node f
   - All checks and functionalitys are processed (like hunger damage and tool wear) as if the player did the mining manually
   - Really nice effect in combination with item_drop mod
 
-### Develper notes
+## Develper notes
 The mod does have some settings, hooks and an objects style API for game- or other-mods related enhancements.
 
-#### (default) Settings
+### (default) Settings
 ```
 woodcutting.settings = {
 	tree_distance = 1,   -- Apply tree nodes with this distance to the queue. 1 means touching tree nodes only
@@ -21,7 +21,7 @@ woodcutting.settings = {
 }
 ```
 
-#### Hooks
+### Hooks
 ```
 woodcutting.settings = {
 	on_new_process_hook = function(process) return true end, -- do not start the process if set to nil or return false
@@ -30,16 +30,16 @@ woodcutting.settings = {
 	on_after_dig_hook = function(process, pos, oldnode) return true end, -- if false is returned do nothing after digging node
   ```
   
- #### Process object
+ ### Process object
  The hooks get an lua-objects in interface that means a lua-table with functions and setting attributes. The methods could be redefined in on_new_process_hook() function. That means it is possible to use different implemntations by different users at the same time.
 
-##### Attributes
+#### Attributes
 See (default) Settings
   - process.tree_distance   - used in process:add_tree_neighbors(pos) - can be adjusted each step in on_after_dig_hook()
   - process.leaves_distance - used in process:process_leaves(pos) - can be adjusted each step in on_after_dig_hook()
   - process.player_distance - used in process:check_processing_allowed(pos) - can be adjusted each step in on_step_hook()
 
-##### Methods
+#### Methods
 Note:this methods could be redefined in on_new_process_hook, in a different way for each new process
   - process:stop_process()          - Finish the process
   - process:add_tree_neighbors(pos) - Add nearly tree nodes to the processing list
