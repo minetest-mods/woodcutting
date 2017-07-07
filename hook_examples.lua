@@ -23,8 +23,6 @@ function woodcutting.settings.on_after_dig_hook(process, pos, oldnode)
 	else
 		process.treenode_counter = process.treenode_counter + 1
 	end
-
-	print("Counter:", process.treenode_counter)
 	if process.treenode_counter >= process.max_tree_count then
 		process:stop_process()
 		return false
