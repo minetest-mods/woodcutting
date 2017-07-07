@@ -1,12 +1,13 @@
 woodcutting = {}
 
 woodcutting.settings = {
-	tree_distance = 1,   -- 1 means touching nodes only
+	tree_distance = 1,   -- Apply tree nodes with this distance to the queue. 1 means touching tree nodes only
 	leaves_distance = 2, -- do not touch leaves around the not removed trees with this distance
-	player_distance = 80, -- max distance away from player
+	player_distance = 80, -- Allow cutting tree nodes with this maximum distance away from player
 	on_new_process_hook = function(process) return true end, -- do not start the process if set to nil or return false
 	on_step_hook = function(process) return true end,        -- if false is returned finish the process
-	on_woodcut_hook = function(process, pos) return true end, -- if false is returned the node is skipped
+	on_before_dig_hook = function(process, pos) return true end, -- if false is returned the node is not digged
+	on_after_dig_hook = function(process, pos, oldnode) return true end, -- if false is returned do nothing after digging node
 }
 
 woodcutting.tree_content_ids = {}
@@ -183,15 +184,15 @@ function woodcutting_class:woodcut_node(pos, delay)
 			process.treenodes_hashed[poshash] = nil
 		end
 
-		local hook = woodcutting.settings.on_woodcut_hook(process, pos)
-		if hook == false then
-			return
-		end
-
 		-- Check right node at the place before removal
 		local node = minetest.get_node(pos)
 		local id = minetest.get_content_id(node.name)
 		if not (woodcutting.tree_content_ids[id] or woodcutting.leaves_content_ids[id]) then
+			return
+		end
+
+		local hook = woodcutting.settings.on_before_dig_hook(process, pos)
+		if hook == false then
 			return
 		end
 
@@ -280,6 +281,12 @@ minetest.register_on_dignode(function(pos, oldnode, digger)
 	if not process then
 		return
 	end
+
+	local hook = woodcutting.settings.on_after_dig_hook(process, pos, oldnode)
+	if hook == false then
+		return
+	end
+
 
 	-- process the sneak toggle
 	if sneak then
