@@ -49,5 +49,6 @@ Note:this methods could be redefined in on_new_process_hook, in a different way 
   - process:process_woodcut_step()  - Processing step. Should not be redefined - use on_step_hook instead
   - process:woodcut_node(pos, delay) - Cut a tree or leaves node - Should not be redefined - on_before_dig_hook instead
   - process:process_leaves(pos)     - Process leaves around the digged pos
-  - process:show_hud(pos)           - Create and update players HUD (disabling is in stop_process)
-  
+  - process:get_hud_message(pos)    - Get the HUD message
+  - process:show_hud(pos)           - Create and update players HUD using the get_hud_messgae() method (HUD is disabled in stop_process)
+

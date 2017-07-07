@@ -237,6 +237,18 @@ function woodcutting_class:process_leaves(pos)
 end
 
 ----------------------------------
+--- Create hud message
+----------------------------------
+function woodcutting_class:get_hud_message(pos)
+	local message = "Woodcutting active. Hold sneak key to disable it"
+	if pos then
+		message = '['..#self.treenodes_sorted..'] '..minetest.pos_to_string(pos).." | "..message
+	end
+	return message
+
+end
+
+----------------------------------
 --- Enable players hud message
 ----------------------------------
 function woodcutting_class:show_hud(pos)
@@ -244,10 +256,7 @@ function woodcutting_class:show_hud(pos)
 		return
 	end
 
-	local message = "Woodcutting active. Hold sneak key to disable it"
-	if pos then
-		message = '['..#self.treenodes_sorted..'] '..minetest.pos_to_string(pos).." | "..message
-	end
+	local message = self:get_hud_message(pos)
 
 	if self._hud then
 		self._player:hud_change(self._hud, "text", message)
@@ -338,3 +347,5 @@ minetest.register_on_dieplayer(function(player)
 		process:stop_process()
 	end
 end)
+
+--dofile(minetest.get_modpath(minetest.get_current_modname()).."/hook_examples.lua")
