@@ -8,3 +8,46 @@ This mod is an asynchrounus tree cutter for minetest. Mine the first tree node f
   - The auto-mining speed is dependant on wielded tool, so the diamond axe is still advantageously than empty hand
   - All checks and functionalitys are processed (like hunger damage and tool wear) as if the player did the mining manually
   - Really nice effect in combination with item_drop mod
+
+### Develper notes
+The mod does have some settings, hooks and an objects style API for game- or other-mods related enhancements.
+
+#### (default) Settings
+```
+woodcutting.settings = {
+	tree_distance = 1,   -- Apply tree nodes with this distance to the queue. 1 means touching tree nodes only
+	leaves_distance = 2, -- do not touch leaves around the not removed trees with this distance
+	player_distance = 80, -- Allow cutting tree nodes with this maximum distance away from player
+}
+```
+
+#### Hooks
+```
+woodcutting.settings = {
+	on_new_process_hook = function(process) return true end, -- do not start the process if set to nil or return false
+	on_step_hook = function(process) return true end,        -- if false is returned finish the process
+	on_before_dig_hook = function(process, pos) return true end, -- if false is returned the node is not digged
+	on_after_dig_hook = function(process, pos, oldnode) return true end, -- if false is returned do nothing after digging node
+  ```
+  
+ #### Process object
+ The hooks get an lua-objects in interface that means a lua-table with functions and setting attributes. The methods could be redefined in on_new_process_hook() function. That means it is possible to use different implemntations by different users at the same time.
+
+##### Attributes
+See (default) Settings
+  - process.tree_distance   - used in process:add_tree_neighbors(pos) - can be adjusted each step in on_after_dig_hook()
+  - process.leaves_distance - used in process:process_leaves(pos) - can be adjusted each step in on_after_dig_hook()
+  - process.player_distance - used in process:check_processing_allowed(pos) - can be adjusted each step in on_step_hook()
+
+##### Methods
+Note:this methods could be redefined in on_new_process_hook, in a different way for each new process
+  - process:stop_process()          - Finish the process
+  - process:add_tree_neighbors(pos) - Add nearly tree nodes to the processing list
+  - process:get_delay_time(pos)     - Get delay time to dig the node at pos
+  - process:check_processing_allowed(pos) - Check if tree cut is allowed at pos
+  - process:select_next_tree_node() - Get the next node from processing list
+  - process:process_woodcut_step()  - Processing step. Should not be redefined - use on_step_hook instead
+  - process:woodcut_node(pos, delay) - Cut a tree or leaves node - Should not be redefined - on_before_dig_hook instead
+  - process:process_leaves(pos)     - Process leaves around the digged pos
+  - process:show_hud(pos)           - Create and update players HUD (disabling is in stop_process)
+  
