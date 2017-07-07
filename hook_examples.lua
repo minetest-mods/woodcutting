@@ -2,7 +2,7 @@
 -- Example for (custom) attribute change on new process init and an method redefinition 
 ----------------------------
 function woodcutting.settings.on_new_process_hook(process)
-	process.max_tree_count = 10
+	process.max_tree_count = 99
 
 	process._get_hud_message_orig = process.get_hud_message
 	function process:get_hud_message(pos)
