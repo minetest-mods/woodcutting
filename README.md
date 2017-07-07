@@ -2,6 +2,8 @@
 
 This mod is an asynchrounus tree cutter for minetest. Mine the first tree node from a tree while the sneak key is pressed, then wait till the whole tree is breaked down and in your inventory.
 
+![Screenshot](https://github.com/bell07/minetest-woodcutting/raw/master/screenshot.png)
+
 ## Highlights / Features
   - Lag-free because the work is not done at once
   - You can stop the work by press sneak key second time
