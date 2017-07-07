@@ -3,6 +3,7 @@ woodcutting = {}
 woodcutting.settings = {
 	tree_distance = 1,   -- 1 means touching nodes only
 	leaves_distance = 2, -- do not touch leaves around the not removed trees with this distance
+	player_distance = 80, -- max distance away from player
 	on_new_process_hook = function(process) return true end, -- do not start the process if set to nil or return false
 	on_step_hook = function(process) return true end,        -- if false is returned finish the process
 	on_woodcut_hook = function(process, pos) return true end, -- if false is returned the node is skipped
@@ -26,6 +27,7 @@ function woodcutting.new_process(playername, template)
 	process.playername = playername
 	process.tree_distance = process.tree_distance or woodcutting.settings.tree_distance
 	process.leaves_distance = process.leaves_distance or woodcutting.settings.leaves_distance
+	process.player_distance = process.player_distance or woodcutting.settings.player_distance
 
 	local hook = woodcutting.settings.on_new_process_hook(process)
 	if hook == false then
@@ -106,7 +108,7 @@ end
 --- Check node removal allowed
 ----------------------------------
 function woodcutting_class:check_processing_allowed(pos)
-	return vector.distance(pos, self._player:get_pos()) < 100
+	return vector.distance(pos, self._player:get_pos()) < self.player_distance
 end
 
 ----------------------------------
