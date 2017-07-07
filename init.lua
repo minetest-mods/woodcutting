@@ -154,6 +154,11 @@ function woodcutting_class:process_woodcut_step()
 				-- dig the node
 				local delaytime = process:get_delay_time(pos)
 				process:woodcut_node(pos, delaytime)
+			else
+				-- just remove from hashed table and trigger the next step
+				local poshash = minetest.hash_node_position(pos)
+				process.treenodes_hashed[poshash] = nil
+				process:process_woodcut_step()
 			end
 		elseif next(process.treenodes_hashed) then
 			-- nothing selected but still running. Trigger next step
