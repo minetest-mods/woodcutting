@@ -2,14 +2,21 @@
 
 This mod is an asynchrounus tree cutter for minetest. Mine the first tree node from a tree while the sneak key is pressed, then wait till the whole tree is breaked down and in your inventory.
 
+Forum: https://forum.minetest.net/viewtopic.php?f=9&t=18023
+
 ![Screenshot](https://github.com/bell07/minetest-woodcutting/raw/master/screenshot.png)
 
 ## Highlights / Features
-  - Lag-free because the work is not done at once
-  - You can stop the work by press sneak key second time
-  - The auto-mining speed is dependant on wielded tool, so the diamond axe is still advantageously than empty hand
-  - All checks and functionalitys are processed (like hunger damage and tool wear) as if the player did the mining manually
+  - Lag-free because the work is not done at once. You can observe the woodcutting.
+  - You can stop the woodcutting by press sneak key second time
+  - You can add additional trees to process by digging other tree nodes manually
+  - The distance to the player is used to prefer next node so the player can partially influence the work direction on big areas
+  - The auto-mining speed is dependent on wielded tool, so the diamond axe is still advantageously than empty hand
+  - All checks and functionalities are processed (like hunger damage and tool wear) as if the player did the mining manually
   - Really nice effect in combination with item_drop mod
+  - Does work with all trees in Item group "tree" and "leafdecay" leaves and fruits
+  - Simple HUD message about woodcutting process status if active
+  - For developers - an enhancement API
 
 ## Develper notes
 The mod does have some settings, hooks and an objects style API for game- or other-mods related enhancements.
