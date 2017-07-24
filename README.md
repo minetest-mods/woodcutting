@@ -24,9 +24,10 @@ The mod does have some settings, hooks and an objects style API for game- or oth
 ### (default) Settings
 ```
 woodcutting.settings = {
-	tree_distance = 1,   -- Apply tree nodes with this distance to the queue. 1 means touching tree nodes only
-	leaves_distance = 2, -- do not touch leaves around the not removed trees with this distance
+	tree_distance = 1,    -- Apply tree nodes with this distance to the queue. 1 means touching tree nodes only
+	leaves_distance = 2,  -- do not touch leaves around the not removed trees with this distance
 	player_distance = 80, -- Allow cutting tree nodes with this maximum distance away from player
+	dig_leaves = true,    -- Dig dacayable leaves after tree node is digged - can be changed trough woodcutting_dig_leaves in minetest.conf
 }
 ```
 
@@ -47,6 +48,7 @@ See (default) Settings
   - process.tree_distance   - used in process:add_tree_neighbors(pos) - can be adjusted each step in on_after_dig_hook()
   - process.leaves_distance - used in process:process_leaves(pos) - can be adjusted each step in on_after_dig_hook()
   - process.player_distance - used in process:check_processing_allowed(pos) - can be adjusted each step in on_step_hook()
+  - process.dig_leaves      - used at end of on_dignode function - can be adjusted each step in on_after_dig_hook()
 
 #### Methods
 Note:this methods could be redefined in on_new_process_hook, in a different way for each new process

@@ -1,14 +1,21 @@
 woodcutting = {}
 
 woodcutting.settings = {
-	tree_distance = 1,   -- Apply tree nodes with this distance to the queue. 1 means touching tree nodes only
-	leaves_distance = 2, -- do not touch leaves around the not removed trees with this distance
+	tree_distance = 1,    -- Apply tree nodes with this distance to the queue. 1 means touching tree nodes only
+	leaves_distance = 2,  -- do not touch leaves around the not removed trees with this distance
 	player_distance = 80, -- Allow cutting tree nodes with this maximum distance away from player
-	on_new_process_hook = function(process) return true end, -- do not start the process if set to nil or return false
-	on_step_hook = function(process) return true end,        -- if false is returned finish the process
-	on_before_dig_hook = function(process, pos) return true end, -- if false is returned the node is not digged
+	dig_leaves = true,    -- Dig dacayable leaves after tree node is digged
+
+	on_new_process_hook = function(process) return true end,             -- do not start the process if set to nil or return false
+	on_step_hook = function(process) return true end,                    -- if false is returned finish the process
+	on_before_dig_hook = function(process, pos) return true end,         -- if false is returned the node is not digged
 	on_after_dig_hook = function(process, pos, oldnode) return true end, -- if false is returned do nothing after digging node
 }
+
+local _woodcutting_dig_leaves = minetest.settings:get_bool("woodcutting_dig_leaves")
+if _woodcutting_dig_leaves ~= nil then
+	woodcutting.settings.dig_leaves = _woodcutting_dig_leaves
+end
 
 woodcutting.tree_content_ids = {}
 woodcutting.leaves_content_ids = {}
@@ -29,6 +36,14 @@ function woodcutting.new_process(playername, template)
 	process.tree_distance = process.tree_distance or woodcutting.settings.tree_distance
 	process.leaves_distance = process.leaves_distance or woodcutting.settings.leaves_distance
 	process.player_distance = process.player_distance or woodcutting.settings.player_distance
+
+	if process.dig_leaves == nil then --bool value with default value true
+		if woodcutting.settings.dig_leaves == nil then
+			process.dig_leaves = false
+		else
+			process.dig_leaves = woodcutting.settings.dig_leaves
+		end
+	end
 
 	local hook = woodcutting.settings.on_new_process_hook(process)
 	if hook == false then
@@ -320,7 +335,9 @@ minetest.register_on_dignode(function(pos, oldnode, digger)
 	process:add_tree_neighbors(pos)
 
 	-- process leaves for cutted node
-	process:process_leaves(pos)
+	if process.dig_leaves then
+		process:process_leaves(pos)
+	end
 end)
 
 ----------------------------
