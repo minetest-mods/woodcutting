@@ -117,7 +117,15 @@ function woodcutting_class:get_delay_time(pos)
 	local nodedef = minetest.registered_nodes[self.treenodes_hashed[poshash]]
 	local capabilities = self._player:get_wielded_item():get_tool_capabilities()
 	local dig_params = minetest.get_dig_params(nodedef.groups, capabilities)
-	return dig_params.time
+	if dig_params.diggable then
+		return dig_params.time
+	else
+		-- try hand if the tool is not able to dig
+		local dig_params = minetest.get_dig_params(nodedef.groups, minetest.registered_items[""].tool_capabilities)
+		if dig_params.diggable then
+			return dig_params.time
+		end
+	end
 end
 
 ----------------------------------
@@ -168,7 +176,13 @@ function woodcutting_class:process_woodcut_step()
 			if process:check_processing_allowed(pos) then
 				-- dig the node
 				local delaytime = process:get_delay_time(pos)
-				process:woodcut_node(pos, delaytime)
+				if delaytime then
+					process:woodcut_node(pos, delaytime)
+				else
+					-- wait for right tool is used, try again
+					process:process_woodcut_step()
+					return
+				end
 			else
 				-- just remove from hashed table and trigger the next step
 				local poshash = minetest.hash_node_position(pos)
