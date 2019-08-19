@@ -117,6 +117,11 @@ end
 function woodcutting_class:get_delay_time(pos)
 	local poshash = minetest.hash_node_position(pos)
 	local nodedef = minetest.registered_nodes[self.treenodes_hashed[poshash]]
+	if not nodedef then
+		-- in case the nodedef is not found
+		return 1.0
+	end
+
 	local capabilities = self._player:get_wielded_item():get_tool_capabilities()
 	local dig_params = minetest.get_dig_params(nodedef.groups, capabilities)
 	if dig_params.diggable then
