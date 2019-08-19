@@ -119,6 +119,9 @@ function woodcutting_class:get_delay_time(pos)
 	local nodedef = minetest.registered_nodes[self.treenodes_hashed[poshash]]
 	if not nodedef then
 		-- in case the nodedef is not found
+		minetest.log("error", "[woodcutting] unknown Item: " ..
+			self.treenodes_hashed[poshash] ..
+			" @ " .. minetest.pos_to_string(pos))
 		return 1.0
 	end
 
