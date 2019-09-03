@@ -393,16 +393,21 @@ minetest.register_chatcommand("toggle_woodcutting", {
 		if is_currently_disabled then
 			disabled_by_player[player_name] = nil
 			mod_storage:set_string(player_name .. "_disabled", "")
-			return true, "Woodcutting is now disabled."
+			return true, "Woodcutting is now enabled."
 		else
 			disabled_by_player[player_name] = true
 			mod_storage:set_string(player_name .. "_disabled", "true")
-			return true, "Woodcutting is now enabled."
+			local process = woodcutting.get_process(player_name)
+			if process then
+				process:stop_process()
+			end
+			return true, "Woodcutting is now disabled."
 		end
 	end
 })
 
 minetest.register_on_joinplayer(function(player)
+	-- load player settings
 	local player_name = player:get_player_name()
 	if mod_storage:get_string(player_name .. "_disabled") == "true" then
 		disabled_by_player[player_name] = true
@@ -412,4 +417,8 @@ end)
 minetest.register_on_leaveplayer(function(player)
 	local player_name = player:get_player_name()
 	disabled_by_player[player_name] = nil
+	local process = woodcutting.get_process(player_name)
+	if process then
+		process:stop_process()
+	end
 end)
