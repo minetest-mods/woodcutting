@@ -431,3 +431,6 @@ minetest.register_on_leaveplayer(function(player)
 		process:stop_process()
 	end
 end)
+
+-- print to log after mod was loaded successfully
+print ("[MOD] Wood Cutting loaded")
